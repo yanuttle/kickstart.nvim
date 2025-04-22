@@ -65,11 +65,15 @@ p.s. you can delete this when you're done too. it's your config now! :)
 -- set <space> as the leader key
 -- see `:help mapleader`
 --  note: must happen before plugins are loaded (otherwise wrong leader will be used)
+
+-- ensure the cargo‐installed tree-sitter is found by Neovim jobs
+vim.env.PATH = os.getenv 'HOME' .. '/.cargo/bin:' .. vim.env.PATH
+
 vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
 
 -- set to true if you have a nerd font installed and selected in the terminal
-vim.g.have_nerd_font = false
+vim.g.have_nerd_font = true
 
 -- [[ setting options ]]
 -- see `:help vim.opt`
@@ -80,7 +84,11 @@ vim.g.have_nerd_font = false
 vim.opt.number = true
 -- you can also add relative line numbers, to help with jumping.
 --  experiment for yourself to see if you like it!
--- vim.opt.relativenumber = true
+--  You can toggle the relative line numbers
+
+vim.keymap.set('n', '<c-l><c-l>', function()
+  vim.opt.relativenumber = not vim.wo.relativenumber
+end, { desc = 'Toggle relative line numbers' })
 
 -- enable mouse mode, can be useful for resizing splits for example!
 vim.opt.mouse = 'a'
@@ -316,6 +324,7 @@ require('lazy').setup({
 
       -- document existing key chains
       spec = {
+        { '<leader>p', group = '[p]roject' },
         { '<leader>c', group = '[c]ode', mode = { 'n', 'x' } },
         { '<leader>d', group = '[d]ocument' },
         { '<leader>r', group = '[r]ename' },
@@ -650,6 +659,7 @@ require('lazy').setup({
       --        for example, to see the options for `lua_ls`, you could go to: https://luals.github.io/wiki/settings/
       local servers = {
         clangd = {},
+        texlab = {},
         -- gopls = {},
         -- pyright = {},
         rust_analyzer = {},
@@ -728,6 +738,8 @@ require('lazy').setup({
         desc = '[f]ormat buffer',
       },
     },
+
+    -- 1) register a custom formatter called “latexindent”
     opts = {
       notify_on_error = false,
       format_on_save = function(bufnr)
@@ -744,10 +756,11 @@ require('lazy').setup({
           }
         end
       end,
+
       formatters_by_ft = {
         lua = { 'stylua' },
         rust = { 'rustfmt' }, -- todo: check if it's actually ok
-
+        tex = { 'latexindent' },
         -- conform can also run multiple formatters sequentially
         -- python = { "isort", "black" },
         --
@@ -777,12 +790,13 @@ require('lazy').setup({
           -- `friendly-snippets` contains a variety of premade snippets.
           --    see the readme about individual language/framework/plugin snippets:
           --    https://github.com/rafamadriz/friendly-snippets
-          -- {
-          --   'rafamadriz/friendly-snippets',
-          --   config = function()
-          --     require('luasnip.loaders.from_vscode').lazy_load()
-          --   end,
-          -- },
+          {
+            'rafamadriz/friendly-snippets',
+            config = function()
+              require('luasnip.loaders.from_vscode').lazy_load()
+              require('luasnip').filetype_extend('tex', { 'latex' })
+            end,
+          },
         },
       },
       'saadparwaiz1/cmp_luasnip',
@@ -825,7 +839,7 @@ require('lazy').setup({
           -- accept ([y]es) the completion.
           --  this will auto-import if your lsp supports it.
           --  this will expand snippets if the lsp sent a snippet.
-          ['<c-y>'] = cmp.mapping.confirm { select = true },
+          ['<tab>'] = cmp.mapping.confirm { select = true },
 
           -- if you prefer more traditional completion keymaps,
           -- you can uncomment the following lines
@@ -874,31 +888,50 @@ require('lazy').setup({
       }
     end,
   },
-
-  { -- You can easily change to a different colorscheme.
-    -- Change the name of the colorscheme plugin below, and then
-    -- change the command in the config to whatever the name of that colorscheme is.
-    --
-    -- If you want to see what colorschemes are already installed, you can use `:Telescope colorscheme`.
-    'rebelot/kanagawa.nvim',
-    priority = 1000, -- Make sure to load this before all the other start plugins.
+  {
+    'catppuccin/nvim',
+    name = 'catppuccin',
+    priority = 1000,
     config = function()
-      ---@diagnostic disable-next-line: missing-fields
-      require('kanagawa').setup {
-        styles = {
-          comments = { italic = false }, -- Disable italics in comments
-        },
-      }
-
-      -- Load the colorscheme here.
-      -- Like many other themes, this one has different styles, and you could load
-      -- any other, such as 'tokyonight-storm', 'tokyonight-moon', or 'tokyonight-day'.
-      vim.cmd.colorscheme 'kanagawa-lotus'
+      vim.cmd.colorscheme 'catppuccin'
     end,
   },
+
+  -- { -- You can easily change to a different colorscheme.
+  --   -- Change the name of the colorscheme plugin below, and then
+  --   -- change the command in the config to whatever the name of that colorscheme is.
+  --   --
+  --   -- If you want to see what colorschemes are already installed, you can use `:Telescope colorscheme`.
+  --   'rebelot/kanagawa.nvim',
+  --   priority = 1000, -- Make sure to load this before all the other start plugins.
+  --   config = function()
+  --     ---@diagnostic disable-next-line: missing-fields
+  --     require('kanagawa').setup {
+  --       styles = {
+  --         comments = { italic = false }, -- Disable italics in comments
+  --       },
+  --     }
+  --
+  --     -- Load the colorscheme here.
+  --     -- Like many other themes, this one has different styles, and you could load
+  --     -- any other, such as 'tokyonight-storm', 'tokyonight-moon', or 'tokyonight-day'.
+  --     vim.cmd.colorscheme 'kanagawa-lotus'
+  --   end,
+  -- },
   --
   -- Highlight todo, notes, etc in comments
   { 'folke/todo-comments.nvim', event = 'VimEnter', dependencies = { 'nvim-lua/plenary.nvim' }, opts = { signs = false } },
+
+  -- latex plugin
+  {
+    'lervag/vimtex',
+    lazy = false, -- we don't want to lazy load VimTeX
+    -- tag = "v2.15", -- uncomment to pin to a specific release
+    init = function()
+      -- VimTeX configuration goes here, e.g.
+      vim.g.vimtex_view_method = 'zathura'
+    end,
+  },
 
   { -- Collection of various small independent plugins/modules
     'echasnovski/mini.nvim',
